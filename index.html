@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>万能下载器-海外版 文天玩WenTianPlay</title>
+    <style>
+        :root { --color-primary: #2196F3; }
+        body { 
+            font-family: -apple-system, system-ui, sans-serif;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .container {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            margin: 1rem 0;
+        }
+        button {
+            background: var(--color-primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        button:hover { opacity: 0.9; }
+        .result { margin-top: 1.5rem; }
+        .download-btn {
+            display: block;
+            background: #4CAF50;
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 8px 0;
+            text-decoration: none;
+            text-align: center;
+        }
+        #loading {
+            display: none;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--color-primary);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin: 1rem auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📥 万能媒体下载器</h1>
+        <p>支持平台：YouTube、Instagram、Twitter、TikTok、Facebook等</p>
+        
+        <input type="text" id="inputUrl" 
+               placeholder="粘贴视频/图片链接...">
+        <button onclick="startDownload()">立即解析</button>
+        
+        <div id="loading"></div>
+        <div class="result" id="result"></div>
+    </div>
+
+<script>
+// 多平台解析库加载器
+const libraries = {
+    youtube: 'https://cdn.jsdelivr.net/npm/ytdl-core-web@latest/dist/ytdl-core.min.js',
+    instagram: 'https://cdn.jsdelivr.net/npm/instagram-save-client@1.0.2/dist/insta.min.js',
+    tiktok: 'https://cdn.jsdelivr.net/npm/tiktok-downloader-lib@1.1.0/dist/tiktok.min.js'
+}
+
+async function loadLibrary(platform) {
+    if (!window[platform]) {
+        await new Promise((resolve, reject) => {
+            const script = document.createElement('script')
+            script.src = libraries[platform]
+            script.onload = resolve
+            script.onerror = reject
+            document.head.appendChild(script)
+        })
+    }
+}
+
+// 通用下载处理器
+async function processUrl(url) {
+    const platform = detectPlatform(url)
+    if (!platform) throw new Error('暂不支持此平台')
+
+    await loadLibrary(platform)
+    return window[platform].getMedia(url)
+}
+
+// 平台检测器
+function detectPlatform(url) {
+    const rules = {
+        youtube: /youtu\.?be/,
+        instagram: /instagram\.com/,
+        tiktok: /tiktok\.com/,
+        twitter: /twitter\.com|x\.com/
+    }
+    return Object.keys(rules).find(k => rules[k].test(url))
+}
+
+// 核心下载逻辑
+async function startDownload() {
+    const url = document.getElementById('inputUrl').value
+    const resultDiv = document.getElementById('result')
+    const loading = document.getElementById('loading')
+    
+    if (!url) return alert('请先输入链接')
+    
+    try {
+        loading.style.display = 'block'
+        resultDiv.innerHTML = ''
+        
+        // 跨域代理（使用公共CORS代理）
+        const proxy = url => `https://corsproxy.io/?${encodeURIComponent(url)}`
+        
+        // 获取媒体信息
+        const media = await processUrl(url)
+        
+        // 生成下载链接
+        const blob = await fetch(proxy(media.url))
+                          .then(r => r.blob())
+        
+        const downloadUrl = URL.createObjectURL(blob)
+        const fileName = `${media.title || 'download'}.${media.ext || 'mp4'}`
+        
+        resultDiv.innerHTML = `
+            <a class="download-btn" href="${downloadUrl}" download="${fileName}">
+                🎬 下载视频 (${media.quality || 'HD'})
+            </a>
+            ${media.thumbnail ? `<img src="${media.thumbnail}" style="max-width:100%;margin-top:1rem">` : ''}
+        `
+    } catch (error) {
+        resultDiv.innerHTML = `<div style="color:red">错误: ${error.message}</div>`
+    } finally {
+        loading.style.display = 'none'
+    }
+}
+
+// 自动识别剪贴板内容
+navigator.clipboard.readText().then(text => {
+    if (detectPlatform(text)) {
+        document.getElementById('inputUrl').value = text
+    }
+}).catch(() => {})
+</script>
+</body>
+</html>
